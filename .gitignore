@@ -1,0 +1,6 @@
+generator_pq_engine
+*.o
+*.swp
+.DS_Store
+.Trash-*
+

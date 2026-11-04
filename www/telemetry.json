@@ -1,0 +1,13 @@
+{
+  "p_mw": 400.00,
+  "q_mvar": 150.00,
+  "v_pu": 1.000,
+  "i_stator_pu": 0.854,
+  "i_field_pu": 0.959,
+  "power_factor": 0.936,
+  "load_angle_deg": 31.61,
+  "xd_pu": 3.00,
+  "xq_pu": 1.00,
+  "mvar_margin_pu": 0.633,
+  "within_sssl": 1
+}

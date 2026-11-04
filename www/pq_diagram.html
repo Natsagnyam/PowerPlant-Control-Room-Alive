@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Capability Curve (P-Q Diagram)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        scada: {
+                            bg: '#0b0f19',
+                            panel: '#111827',
+                            border: '#1f2937',
+                            accent: '#3b82f6',
+                            success: '#10b981',
+                            warning: '#f59e0b',
+                            danger: '#ef4444',
+                            stator: '#06b6d4',
+                            field: '#ec4899',
+                            turbine: '#8b5cf6',
+                            stability: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar for control panels */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden select-none">
+
+    <!-- Header / SCADA Top Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between shadow-lg z-10 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600/20 text-blue-400 p-2 rounded-lg border border-blue-500/30">
+                <i class="fa-solid font-bold fa-bolt text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-wide text-slate-100 flex items-center gap-2">
+                    GENERATOR CAPABILITY MONITOR
+                    <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800">BBB-PUB-SCADA-01</span>
+                </h1>
+                <p class="text-xs text-slate-400">Synchronous Machine P-Q Operating Limits & Capability Boundary</p>
+            </div>
+        </div>
+
+        <!-- Machine Ratings Preset Select -->
+        <div class="flex items-center gap-4 mt-2 sm:mt-0">
+            <div class="flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                <label class="text-xs text-slate-400 font-medium whitespace-nowrap"><i class="fa-solid fa-sliders text-xs mr-1 text-slate-500"></i>Preset Machine:</label>
+                <select id="presetSelect" class="bg-slate-900 text-xs font-mono text-blue-400 focus:outline-none cursor-pointer pr-2">
+                    <option value="custom">Standard Utility (500 MVA, 0.85 PF)</option>
+                    <option value="hydro">Hydro Generator (Salient Pole, Low Xd)</option>
+                    <option value="turbo">Turbo Generator (Round Rotor, High Xd)</option>
+                    <option value="nuclear">Nuclear Base Load (Large Rotor Thermal Limit)</option>
+                </select>
+            </div>
+
+            <!-- Alarm / Status Banner Top -->
+            <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold font-mono border transition-all duration-300 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                <span class="relative flex h-2 w-2">
+                  <span id="statusPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span id="statusDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span id="statusText">NORMAL OPERATING ZONE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 overflow-hidden relative">
+
+        <!-- Left Column: SCADA Controls & Telemetry Readouts (4 cols) -->
+        <div class="lg:col-span-4 xl:col-span-3 flex flex-col gap-4 overflow-y-auto pr-1">
+
+            <!-- Real-time Telemetry Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-gauge-high text-blue-400"></i> Live Telemetry Output
+                </h2>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- MW Active Power -->
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-lg p-2.5">
+                        <div class="text-[10px] text-slate-400 uppercase font-medium">Active Power (P)</div>
+                        <div class="text-lg font-mono font-bold text-white mt-0.5" id="readoutP_MW">0 MW</div>
+                        <div class="text-xs font-mono text-blue-400" id="readoutP_PU">0.000 pu</div>
+                    </div>
+
+                    <!-- MVAR Reactive Power -->
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-lg p-2.5">
+                        <div class="text-[10px] text-slate-400 uppercase font-medium">Reactive Power (Q)</div>
+                        <div class="text-lg font-mono font-bold text-white mt-0.5" id="readoutQ_MVAR">0 MVAR</div>
+                        <div class="text-xs font-mono text-amber-400" id="readoutQ_PU">0.000 pu</div>
+                    </div>
+
+                    <!-- Apparent Power S -->
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-lg p-2.5">
+                        <div class="text-[10px] text-slate-400 uppercase font-medium">Apparent Power (S)</div>
+                        <div class="text-lg font-mono font-bold text-cyan-400 mt-0.5" id="readoutS_MVA">0 MVA</div>
+                        <div class="text-xs font-mono text-cyan-500/80" id="readoutS_PU">0.000 pu</div>
+                    </div>
+
+                    <!-- Power Factor -->
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-lg p-2.5">
+                        <div class="text-[10px] text-slate-400 uppercase font-medium">Power Factor (PF)</div>
+                        <div class="text-lg font-mono font-bold text-emerald-400 mt-0.5" id="readoutPF">1.000</div>
+                        <div class="text-xs font-mono text-emerald-500/80" id="readoutPFType">Unity</div>
+                    </div>
+                </div>
+
+                <!-- Auxiliary Telemetry Bar -->
+                <div class="mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs font-mono text-slate-400">
+                    <div>Stator Loading: <span id="readoutStatorPct" class="text-slate-200 font-bold">0%</span></div>
+                    <div>Field Loading: <span id="readoutFieldPct" class="text-slate-200 font-bold">0%</span></div>
+                    <div>Load Angle (&delta;): <span id="readoutDelta" class="text-slate-200 font-bold">0.0°</span></div>
+                    <div>Margin to Limit: <span id="readoutMargin" class="text-slate-200 font-bold">100%</span></div>
+                </div>
+            </div>
+
+            <!-- Operating Point Dispatch Controls -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-sliders text-blue-400 mr-1.5"></i> Operational Control</span>
+                        <button id="resetPointBtn" class="text-[10px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded transition">
+                            <i class="fa-solid fa-rotate-left mr-1"></i>Reset Point
+                        </button>
+                    </h2>
+
+                    <!-- P Control Slider -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="sliderP" class="text-xs font-semibold text-slate-300">
+                                MW Control (Active Power P)
+                            </label>
+                            <span class="text-xs font-mono text-blue-400 font-bold" id="sliderP_Val">0.80 pu</span>
+                        </div>
+                        <input type="range" id="sliderP" min="0" max="1.2" step="0.005" value="0.8" 
+                            class="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                            <span>0.0 (Motoring Limit)</span>
+                            <span>1.0 (Rated MW)</span>
+                            <span>1.2 (Overpower)</span>
+                        </div>
+                    </div>
+
+                    <!-- Q Control Slider -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="sliderQ" class="text-xs font-semibold text-slate-300">
+                                MVAR Control (Excitation / VAR)
+                            </label>
+                            <span class="text-xs font-mono text-amber-400 font-bold" id="sliderQ_Val">+0.30 pu</span>
+                        </div>
+                        <input type="range" id="sliderQ" min="-1.0" max="1.0" step="0.005" value="0.3" 
+                            class="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                            <span>-1.0 (Leading / Import)</span>
+                            <span>0.0</span>
+                            <span>+1.0 (Lagging / Export)</span>
+                        </div>
+                    </div>
+
+                    <!-- Machine Parameters Collapsible / Advanced Settings -->
+                    <details class="bg-slate-950/60 rounded-lg border border-slate-800/80 p-3 mt-2 text-xs">
+                        <summary class="font-semibold text-slate-300 cursor-pointer flex items-center justify-between">
+                            <span><i class="fa-solid fa-gear text-slate-400 mr-1.5"></i> Machine Design Parameters</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 text-[10px]"></i>
+                        </summary>
+                        <div class="mt-3 space-y-3 pt-2 border-t border-slate-800">
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Rated Base MVA ($S_{base}$):</span>
+                                    <span id="paramSbaseVal" class="font-mono text-slate-200">500 MVA</span>
+                                </div>
+                                <input type="range" id="paramSbase" min="100" max="1200" step="50" value="500" class="w-full h-1 bg-slate-800 rounded accent-slate-400">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Rated Power Factor ($\cos\phi$):</span>
+                                    <span id="paramPFVal" class="font-mono text-slate-200">0.85 Lagging</span>
+                                </div>
+                                <input type="range" id="paramPF" min="0.7" max="0.95" step="0.01" value="0.85" class="w-full h-1 bg-slate-800 rounded accent-slate-400">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Synchronous Reactance ($X_d$):</span>
+                                    <span id="paramXdVal" class="font-mono text-slate-200">1.80 pu</span>
+                                </div>
+                                <input type="range" id="paramXd" min="1.0" max="2.5" step="0.05" value="1.8" class="w-full h-1 bg-slate-800 rounded accent-slate-400">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Turbine MW Cutoff ($P_{max}$):</span>
+                                    <span id="paramPmaxVal" class="font-mono text-slate-200">1.00 pu</span>
+                                </div>
+                                <input type="range" id="paramPmax" min="0.8" max="1.15" step="0.01" value="1.0" class="w-full h-1 bg-slate-800 rounded accent-slate-400">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Stability Limit Margin ($k_s$):</span>
+                                    <span id="paramKsVal" class="font-mono text-slate-200">10% Margin</span>
+                                </div>
+                                <input type="range" id="paramKs" min="0.0" max="0.25" step="0.01" value="0.10" class="w-full h-1 bg-slate-800 rounded accent-slate-400">
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Display Toggles -->
+                <div class="mt-4 pt-3 border-t border-slate-800 flex flex-wrap gap-2 text-xs">
+                    <label class="flex items-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-200">
+                        <input type="checkbox" id="chkVector" checked class="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0">
+                        <span>Show S Vector</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-200">
+                        <input type="checkbox" id="chkSafeZone" checked class="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0">
+                        <span>Safe Zone Shading</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-200">
+                        <input type="checkbox" id="chkGrid" checked class="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0">
+                        <span>Grid Lines</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Interactive Canvas Diagram (8 cols) -->
+        <div class="lg:col-span-8 xl:col-span-9 bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden relative shadow-2xl">
+            
+            <!-- Canvas Overlay Header Legend -->
+            <div class="absolute top-3 left-4 right-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-10 bg-slate-950/80 backdrop-blur-md p-2.5 rounded-lg border border-slate-800/80">
+                <div class="flex flex-wrap items-center gap-3 text-xs font-semibold">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-cyan-500 inline-block"></span>
+                        <span class="text-slate-300">Stator Current Limit (1.0 pu)</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-pink-500 inline-block"></span>
+                        <span class="text-slate-300">Rotor / Field Limit</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span>
+                        <span class="text-slate-300">Prime Mover Limit ($P_{max}$)</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                        <span class="text-slate-300">Stability Limit (UEL)</span>
+                    </div>
+                </div>
+
+                <div class="text-[11px] font-mono text-slate-400 pointer-events-auto">
+                    <span class="text-slate-500"><i class="fa-solid fa-mouse-pointer mr-1"></i>Click or drag diagram to dispatch</span>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="flex-1 w-full h-full relative" id="canvasContainer">
+                <canvas id="pqCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+            </div>
+
+            <!-- Canvas Footer Info Bar -->
+            <div class="bg-slate-950/90 border-t border-slate-800 px-4 py-2 flex flex-wrap justify-between items-center text-xs font-mono text-slate-400 gap-2">
+                <div class="flex gap-4">
+                    <span>LEFT: <strong class="text-amber-400">Leading PF (Importing MVAR, Under-Excited)</strong></span>
+                    <span>RIGHT: <strong class="text-emerald-400">Lagging PF (Exporting MVAR, Over-Excited)</strong></span>
+                </div>
+                <div>
+                    <span>AXES: Vertical = Active Power P (MW), Horizontal = Reactive Power Q (MVAR)</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Machine Default State & Physics Variables ---
+        const state = {
+            // Operating point in per-unit (pu)
+            P: 0.80,          // Active Power (0 to 1.2)
+            Q: 0.30,          // Reactive Power (-1.0 to +1.0)
+            
+            // Machine Ratings & Parameters
+            S_base: 500,      // Base MVA (e.g. 500 MVA)
+            PF_rated: 0.85,   // Rated lagging power factor
+            Xd: 1.80,         // Synchronous reactance (pu)
+            P_max: 1.00,      // Turbine mechanical power limit (pu)
+            Ks: 0.10,         // Practical stability margin factor (10%)
+            V: 1.00,          // Bus Voltage (pu)
+
+            // Computed Derived Physics Values
+            Q_center_field: 0, // Origin of field limit circle: -V^2 / Xd
+            Ef_rated: 0,       // Field excitation EMF at rated conditions
+            
+            // Render settings
+            showVector: true,
+            showSafeZone: true,
+            showGrid: true,
+
+            // Interactivity
+            isDragging: false,
+        };
+
+        <!-- DOM Element Handles -->
+        const canvas = document.getElementById('pqCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvasContainer');
+
+        // Sliders & Controls
+        const sliderP = document.getElementById('sliderP');
+        const sliderQ = document.getElementById('sliderQ');
+        const sliderP_Val = document.getElementById('sliderP_Val');
+        const sliderQ_Val = document.getElementById('sliderQ_Val');
+        
+        // Parameters
+        const paramSbase = document.getElementById('paramSbase');
+        const paramPF = document.getElementById('paramPF');
+        const paramXd = document.getElementById('paramXd');
+        const paramPmax = document.getElementById('paramPmax');
+        const paramKs = document.getElementById('paramKs');
+        const presetSelect = document.getElementById('presetSelect');
+        const resetPointBtn = document.getElementById('resetPointBtn');
+
+        // Readouts
+        const readoutP_MW = document.getElementById('readoutP_MW');
+        const readoutP_PU = document.getElementById('readoutP_PU');
+        const readoutQ_MVAR = document.getElementById('readoutQ_MVAR');
+        const readoutQ_PU = document.getElementById('readoutQ_PU');
+        readoutS_MVA = document.getElementById('readoutS_MVA');
+        const readoutS_PU = document.getElementById('readoutS_PU');
+        const readoutPF = document.getElementById('readoutPF');
+        const readoutPFType = document.getElementById('readoutPFType');
+        const readoutStatorPct = document.getElementById('readoutStatorPct');
+        const readoutFieldPct = document.getElementById('readoutFieldPct');
+        const readoutDelta = document.getElementById('readoutDelta');
+        const readoutMargin = document.getElementById('readoutMargin');
+        
+        // Badges
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const statusPing = document.getElementById('statusPing');
+
+        // Toggles
+        const chkVector = document.getElementById('chkVector');
+        const chkSafeZone = document.getElementById('chkSafeZone');
+        const chkGrid = document.getElementById('chkGrid');
+
+        // Preset Definitions
+        const presets = {
+            custom: { S_base: 500, PF: 0.85, Xd: 1.80, Pmax: 1.00, Ks: 0.10 },
+            hydro: { S_base: 250, PF: 0.90, Xd: 1.10, Pmax: 1.00, Ks: 0.12 },
+            turbo: { S_base: 800, PF: 0.85, Xd: 2.10, Pmax: 1.05, Ks: 0.08 },
+            nuclear: { S_base: 1100, PF: 0.88, Xd: 1.65, Pmax: 0.95, Ks: 0.10 }
+        };
+
+        // --- Calculation Engine ---
+        function updatePhysics() {
+            // 1. Calculate Field Circle Center: (0, -V^2 / Xd)
+            state.Q_center_field = - (Math.pow(state.V, 2) / state.Xd);
+
+            // 2. Rated operating point on 1.0 pu Stator Circle
+            // P_rated = PF_rated, Q_rated = sqrt(1 - PF_rated^2)
+            const P_rated = state.PF_rated;
+            const Q_rated = Math.sqrt(1.0 - Math.pow(P_rated, 2));
+
+            // 3. Field excitation radius Ef_rated (in MVA/pu scaling terms):
+            // Distance from (0, Q_center_field) to (Q_rated, P_rated)
+            // Ef_rated = sqrt( P_rated^2 + (Q_rated - Q_center_field)^2 )
+            state.Ef_rated = Math.sqrt(Math.pow(P_rated, 2) + Math.pow(Q_rated - state.Q_center_field, 2));
+        }
+
+        function checkOperatingStatus(P, Q) {
+            const S = Math.sqrt(P * P + Q * Q);
+            
+            // Check Stator Limit: S <= 1.0 pu
+            const statorOverload = S > 1.001;
+
+            // Check Prime Mover Limit: P <= P_max
+            const turbineOverload = P > state.P_max + 0.001;
+
+            // Check Field Current Limit: Distance from (0, Q_center_field) <= Ef_rated
+            const distToFieldCenter = Math.sqrt(P * P + Math.pow(Q - state.Q_center_field, 2));
+            const fieldOverload = distToFieldCenter > state.Ef_rated + 0.001;
+
+            // Check Practical Stability Limit / Under-Excitation Limit (UEL)
+            // Practical limit line equation: Q_lim(P) = - V^2/Xd + (P / tan(delta_max)) * (1 - Ks)
+            // Or simplified steady-state UEL curve: Q >= -V^2/Xd + P * tan(margin) or circular stability boundary
+            // Theoretical stability limit is a circle centered at (0, -V^2/(2*Xd)) with radius V^2/(2*Xd)
+            // Practical limit adds margin Ks:
+            const Q_center_stab = - (Math.pow(state.V, 2) / (2 * state.Xd));
+            const R_stab_theoretical = Math.pow(state.V, 2) / (2 * state.Xd);
+            // Practical limit pushes curve to the right (higher excitation required)
+            const R_stab_practical = R_stab_theoretical * (1.0 - state.Ks);
+            
+            // Practical limit breach check (in leading region Q < 0)
+            const distToStabCenter = Math.sqrt(P * P + Math.pow(Q - Q_center_stab, 2));
+            const stabilityViolation = (Q < 0) && (distToStabCenter < R_stab_practical);
+
+            // Compute Load Angle delta (in degrees): delta = atan2(P * Xd, V + Q * Xd)
+            const deltaRad = Math.atan2(P * state.Xd, state.V + Q * state.Xd);
+            const deltaDeg = deltaRad * (180 / Math.PI);
+
+            // Stator loading %
+            const statorPct = (S / 1.0) * 100;
+            // Field loading %
+            const fieldPct = (distToFieldCenter / state.Ef_rated) * 100;
+
+            // Compute minimum distance margin to closest limit
+            const marginStator = 1.0 - S;
+            const marginTurbine = state.P_max - P;
+            const marginField = state.Ef_rated - distToFieldCenter;
+            const minMargin = Math.min(marginStator, marginTurbine, marginField);
+
+            let status = 'NORMAL';
+            let message = 'NORMAL OPERATING ZONE';
+            let colorClass = 'emerald';
+
+            if (turbineOverload) {
+                status = 'TURBINE_OVERLOAD';
+                message = 'TURBINE MW LIMIT EXCEEDED';
+                colorClass = 'purple';
+            } else if (statorOverload) {
+                status = 'STATOR_OVERLOAD';
+                message = 'STATOR OVERCURRENT (1.0 pu)';
+                colorClass = 'cyan';
+            } else if (fieldOverload) {
+                status = 'FIELD_OVERLOAD';
+                message = 'ROTOR FIELD THERMAL OVERLOAD';
+                colorClass = 'pink';
+            } else if (stabilityViolation) {
+                status = 'STABILITY_LIMIT';
+                message = 'UNDER-EXCITATION STABILITY BREACH';
+                colorClass = 'amber';
+            }
+
+            return {
+                status,
+                message,
+                colorClass,
+                S,
+                deltaDeg,
+                statorPct,
+                fieldPct,
+                minMargin: Math.max(0, minMargin * 100)
+            };
+        }
+
+        // --- Render Loop & Canvas Drawing ---
+        function render() {
+            updatePhysics();
+
+            const width = canvas.width;
+            const height = canvas.height;
+
+            // Clear Background
+            ctx.fillStyle = '#0b0f19';
+            ctx.fillRect(0, 0, width, height);
+
+            // Coordinate Transformations
+            // Vertical Axis: P ranging from -0.1 to 1.3 pu
+            // Horizontal Axis: Q ranging from -1.1 to +1.1 pu
+            const minP = -0.1, maxP = 1.3;
+            const minQ = -1.15, maxQ = 1.15;
+
+            // Padding inside canvas
+            const padLeft = 60, padRight = 40, padTop = 50, padBottom = 40;
+            const plotW = width - padLeft - padRight;
+            const plotH = height - padTop - padBottom;
+
+            function toScreenX(q) {
+                return padLeft + ((q - minQ) / (maxQ - minQ)) * plotW;
+            }
+
+            function toScreenY(p) {
+                return height - padBottom - ((p - minP) / (maxP - minP)) * plotH;
+            }
+
+            function toValQ(screenX) {
+                return minQ + ((screenX - padLeft) / plotW) * (maxQ - minQ);
+            }
+
+            function toValP(screenY) {
+                return minP + ((height - padBottom - screenY) / plotH) * (maxP - minP);
+            }
+
+            // --- 1. Draw Grid Lines ---
+            if (state.showGrid) {
+                ctx.strokeStyle = '#1f2937';
+                ctx.lineWidth = 1;
+                ctx.font = '10px "JetBrains Mono"';
+                ctx.fillStyle = '#64748b';
+
+                // Q Grid Lines (Verticals)
+                for (let q = -1.0; q <= 1.0; q += 0.2) {
+                    const x = toScreenX(q);
+                    ctx.beginPath();
+                    ctx.moveTo(x, padTop);
+                    ctx.lineTo(x, height - padBottom);
+                    ctx.stroke();
+
+                    // Labels
+                    const label = q.toFixed(1);
+                    ctx.textAlign = 'center';
+                    ctx.fillText(label, x, height - padBottom + 16);
+                }
+
+                // P Grid Lines (Horizontals)
+                for (let p = 0.0; p <= 1.2; p += 0.2) {
+                    const y = toScreenY(p);
+                    ctx.beginPath();
+                    ctx.moveTo(padLeft, y);
+                    ctx.lineTo(width - padRight, y);
+                    ctx.stroke();
+
+                    // Labels
+                    ctx.textAlign = 'right';
+                    ctx.fillText(p.toFixed(1), padLeft - 8, y + 3);
+                }
+            }
+
+            // --- 2. Draw Main Axes ---
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+
+            // Origin Point
+            const x0 = toScreenX(0);
+            const y0 = toScreenY(0);
+
+            // Horizontal Axis (P = 0 line / Q Axis)
+            ctx.beginPath();
+            ctx.moveTo(padLeft, y0);
+            ctx.lineTo(width - padRight, y0);
+            ctx.stroke();
+
+            // Vertical Axis (Q = 0 line / P Axis)
+            ctx.beginPath();
+            ctx.moveTo(x0, padTop);
+            ctx.lineTo(x0, height - padBottom);
+            ctx.stroke();
+
+            // Axis Title Arrows & Labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText('Active Power P (MW / pu)', x0, padTop - 20);
+
+            ctx.textAlign = 'right';
+            ctx.fillText('← Leading PF (Importing MVAR)', x0 - 30, y0 + 35);
+            ctx.textAlign = 'left';
+            ctx.fillText('Lagging PF (Exporting MVAR) →', x0 + 30, y0 + 35);
+
+            // --- Helper Path Generator for Limits ---
+            // Sampling generator for safe boundary polygon calculation
+            function getBoundaryPoints() {
+                const points = [];
+                // Sweep P from 0 up to P_max
+                const numSteps = 200;
+                
+                const Q_center_stab = - (Math.pow(state.V, 2) / (2 * state.Xd));
+                const R_stab_theoretical = Math.pow(state.V, 2) / (2 * state.Xd);
+                const R_stab_practical = R_stab_theoretical * (1.0 - state.Ks);
+
+                for (let i = 0; i <= numSteps; i++) {
+                    const p = (i / numSteps) * state.P_max;
+                    
+                    // Left Limit (Under-excitation / stability / stator)
+                    // 1. Stator circle limit left: Q = -sqrt(1 - P^2)
+                    let q_left_stator = -Math.sqrt(Math.max(0, 1.0 - p * p));
+                    
+                    // 2. Practical stability curve left limit:
+                    // Circle equation: P^2 + (Q - Q_center_stab)^2 = R_stab_practical^2
+                    let q_left_stab = -999;
+                    const valStab = R_stab_practical * R_stab_practical - p * p;
+                    if (valStab >= 0) {
+                        q_left_stab = Q_center_stab + Math.sqrt(valStab);
+                    }
+
+                    const q_left = Math.max(q_left_stator, q_left_stab);
+
+                    // Right Limit (Field current / stator)
+                    // 1. Stator circle limit right: Q = +sqrt(1 - P^2)
+                    let q_right_stator = Math.sqrt(Math.max(0, 1.0 - p * p));
+
+                    // 2. Field limit right: P^2 + (Q - Q_center_field)^2 = Ef_rated^2
+                    const valField = state.Ef_rated * state.Ef_rated - p * p;
+                    let q_right_field = 999;
+                    if (valField >= 0) {
+                        q_right_field = state.Q_center_field + Math.sqrt(valField);
+                    }
+
+                    const q_right = Math.min(q_right_stator, q_right_field);
+
+                    if (q_left <= q_right) {
+                        points.push({ p, qLeft: q_left, qRight: q_right });
+                    }
+                }
+                return points;
+            }
+
+            const boundary = getBoundaryPoints();
+
+            // --- 3. Fill Safe Operating Zone Shading ---
+            if (state.showSafeZone && boundary.length > 0) {
+                ctx.beginPath();
+                // Bottom left start
+                ctx.moveTo(toScreenX(boundary[0].qLeft), toScreenY(boundary[0].p));
+                
+                // Up along left limit
+                for (let i = 0; i < boundary.length; i++) {
+                    ctx.lineTo(toScreenX(boundary[i].qLeft), toScreenY(boundary[i].p));
+                }
+                
+                // Top border across P_max
+                for (let i = boundary.length - 1; i >= 0; i--) {
+                    ctx.lineTo(toScreenX(boundary[i].qRight), toScreenY(boundary[i].p));
+                }
+
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            // --- 4. Plot Stator Current Limit Arc (1.0 pu Arc) ---
+            ctx.save();
+            ctx.beginPath();
+            // Semi-circle centered at origin (0,0) with radius 1.0 pu
+            // Drawn from angle -PI/2 to +PI/2 in coordinate space
+            const rStatorPixels = Math.abs(toScreenX(1.0) - toScreenX(0));
+            ctx.arc(x0, y0, rStatorPixels, Math.PI, 0, false);
+            ctx.strokeStyle = '#06b6d4'; // Cyan
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
+            ctx.stroke();
+            ctx.restore();
+
+            // --- 5. Plot Rotor Field Thermal Current Limit Arc ---
+            ctx.save();
+            ctx.beginPath();
+            const yFieldCenter = toScreenY(state.Q_center_field);
+            const rFieldPixels = Math.abs(toScreenY(state.Q_center_field + state.Ef_rated) - yFieldCenter);
+            ctx.arc(x0, yFieldCenter, rFieldPixels, Math.PI * 1.1, Math.PI * 1.9, false);
+            ctx.strokeStyle = '#ec4899'; // Pink
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            ctx.restore();
+
+            // --- 6. Plot Prime Mover / Turbine Limit Line (P_max) ---
+            ctx.save();
+            ctx.beginPath();
+            const yPmax = toScreenY(state.P_max);
+            ctx.moveTo(padLeft, yPmax);
+            ctx.lineTo(width - padRight, yPmax);
+            ctx.strokeStyle = '#8b5cf6'; // Purple
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([6, 4]);
+            ctx.stroke();
+            ctx.restore();
+
+            // --- 7. Plot Practical Stability Limit Curve (UEL) ---
+            ctx.save();
+            ctx.beginPath();
+            const Q_center_stab = - (Math.pow(state.V, 2) / (2 * state.Xd));
+            const R_stab_theoretical = Math.pow(state.V, 2) / (2 * state.Xd);
+            const R_stab_practical = R_stab_theoretical * (1.0 - state.Ks);
+            
+            const yStabCenter = toScreenY(Q_center_stab);
+            const rStabPixels = Math.abs(toScreenY(Q_center_stab + R_stab_practical) - yStabCenter);
+            
+            // Draw practical curve in leading quadrant
+            ctx.arc(x0, yStabCenter, rStabPixels, Math.PI * 1.5, Math.PI * 0.5, false);
+            ctx.strokeStyle = '#f59e0b'; // Amber
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            // Theoretical limit line (faint reference)
+            ctx.beginPath();
+            const rStabTheoPixels = Math.abs(toScreenY(Q_center_stab + R_stab_theoretical) - yStabCenter);
+            ctx.arc(x0, yStabCenter, rStabTheoPixels, Math.PI * 1.5, Math.PI * 0.5, false);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.restore();
+
+            // --- 8. Rated Operating Point & PF Line (0.85 PF Lagging) ---
+            const P_rated = state.PF_rated;
+            const Q_rated = Math.sqrt(1.0 - Math.pow(P_rated, 2));
+            const xRated = toScreenX(Q_rated);
+            const yRated = toScreenY(P_rated);
+
+            // Rated Point Dot
+            ctx.fillStyle = '#06b6d4';
+            ctx.beginPath();
+            ctx.arc(xRated, yRated, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rated PF Line Vector
+            ctx.save();
+            ctx.strokeStyle = 'rgba(100, 116, 139, 0.5)';
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(xRated, yRated);
+            ctx.stroke();
+            ctx.restore();
+
+            // Text Label at Rated Point
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '10px "JetBrains Mono"';
+            ctx.textAlign = 'left';
+            ctx.fillText(` Rated Pt (${state.PF_rated} PF)`, xRated + 6, yRated);
+
+            // --- 9. Current Operating Point Vector & Marker ---
+            const curX = toScreenX(state.Q);
+            const curY = toScreenY(state.P);
+
+            // Check Operational Status
+            const opStatus = checkOperatingStatus(state.P, state.Q);
+
+            // Draw Vector S from Origin
+            if (state.showVector) {
+                ctx.save();
+                ctx.strokeStyle = opStatus.status === 'NORMAL' ? '#38bdf8' : '#ef4444';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(x0, y0);
+                ctx.lineTo(curX, curY);
+                ctx.stroke();
+
+                // Arrowhead
+                const angle = Math.atan2(curY - y0, curX - x0);
+                const headLen = 10;
+                ctx.fillStyle = opStatus.status === 'NORMAL' ? '#38bdf8' : '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(curX, curY);
+                ctx.lineTo(curX - headLen * Math.cos(angle - Math.PI / 6), curY - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(curX - headLen * Math.cos(angle + Math.PI / 6), curY - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Target Pulse Halo around Operating Point
+            const pulse = (Date.now() % 1000) / 1000;
+            const haloRadius = 8 + pulse * 6;
+            ctx.beginPath();
+            ctx.arc(curX, curY, haloRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = opStatus.status === 'NORMAL' ? `rgba(56, 189, 248, ${1 - pulse})` : `rgba(239, 68, 68, ${1 - pulse})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Operating Point Center Dot
+            ctx.beginPath();
+            ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = opStatus.status === 'NORMAL' ? '#0284c7' : '#dc2626';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Telemetry Callout Box next to Operating Point
+            ctx.save();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            const calloutW = 110, calloutH = 34;
+            let calloutX = curX + 12;
+            let calloutY = curY - 18;
+            if (calloutX + calloutW > width - padRight) calloutX = curX - calloutW - 12;
+            if (calloutY < padTop) calloutY = curY + 12;
+
+            ctx.beginPath();
+            ctx.roundRect(calloutX, calloutY, calloutW, calloutH, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 10px "JetBrains Mono"';
+            ctx.textAlign = 'left';
+            ctx.fillText(`P: ${(state.P * state.S_base).toFixed(1)} MW`, calloutX + 8, calloutY + 14);
+            ctx.fillText(`Q: ${(state.Q * state.S_base).toFixed(1)} MVAR`, calloutX + 8, calloutY + 26);
+            ctx.restore();
+
+            // --- 10. Update UI Panel Telemetry Cards ---
+            updateUI(opStatus);
+        }
+
+        // --- UI Telemetry Display Synchronization ---
+        function updateUI(opStatus) {
+            const P_MW = state.P * state.S_base;
+            const Q_MVAR = state.Q * state.S_base;
+            const S_MVA = opStatus.S * state.S_base;
+
+            // Power factor computation
+            const pfVal = opStatus.S > 0.001 ? Math.min(1.0, state.P / opStatus.S) : 1.0;
+            let pfType = 'Unity';
+            if (state.Q > 0.005) pfType = 'Lagging (Exporting)';
+            else if (state.Q < -0.005) pfType = 'Leading (Importing)';
+
+            readoutP_MW.innerText = `${P_MW.toFixed(1)} MW`;
+            readoutP_PU.innerText = `${state.P.toFixed(3)} pu`;
+
+            readoutQ_MVAR.innerText = `${Q_MVAR.toFixed(1)} MVAR`;
+            readoutQ_PU.innerText = `${state.Q > 0 ? '+' : ''}${state.Q.toFixed(3)} pu`;
+
+            readoutS_MVA.innerText = `${S_MVA.toFixed(1)} MVA`;
+            readoutS_PU.innerText = `${opStatus.S.toFixed(3)} pu`;
+
+            readoutPF.innerText = pfVal.toFixed(3);
+            readoutPFType.innerText = pfType;
+
+            readoutStatorPct.innerText = `${opStatus.statorPct.toFixed(1)}%`;
+            readoutFieldPct.innerText = `${opStatus.fieldPct.toFixed(1)}%`;
+            readoutDelta.innerText = `${opStatus.deltaDeg.toFixed(1)}°`;
+            readoutMargin.innerText = `${opStatus.minMargin.toFixed(1)}%`;
+
+            // Status Alarm Badge Formatting
+            statusText.innerText = opStatus.message;
+
+            const badgeConfig = {
+                emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+                cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', dot: 'bg-cyan-500' },
+                pink: { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/30', dot: 'bg-pink-500' },
+                purple: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+                amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+            };
+
+            const cfg = badgeConfig[opStatus.colorClass] || badgeConfig.emerald;
+            statusBadge.className = `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold font-mono border transition-all duration-300 ${cfg.bg} ${cfg.text} ${cfg.border}`;
+            statusDot.className = `relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`;
+            statusPing.className = `animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${cfg.dot}`;
+        }
+
+        // --- Canvas Resize & Event Handlers ---
+        function resizeCanvas() {
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            render();
+        }
+
+        function handlePointerInput(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const minP = -0.1, maxP = 1.3;
+            const minQ = -1.15, maxQ = 1.15;
+            const padLeft = 60, padRight = 40, padTop = 50, padBottom = 40;
+            const plotW = canvas.width - padLeft - padRight;
+            const plotH = canvas.height - padTop - padBottom;
+
+            let q = minQ + ((x - padLeft) / plotW) * (maxQ - minQ);
+            let p = minP + ((canvas.height - padBottom - y) / plotH) * (maxP - minP);
+
+            // Clamp range
+            p = Math.max(0.0, Math.min(1.2, p));
+            q = Math.max(-1.0, Math.min(1.0, q));
+
+            state.P = parseFloat(p.toFixed(3));
+            state.Q = parseFloat(q.toFixed(3));
+
+            // Sync Sliders
+            sliderP.value = state.P;
+            sliderQ.value = state.Q;
+            sliderP_Val.innerText = `${state.P.toFixed(2)} pu`;
+            sliderQ_Val.innerText = `${state.Q >= 0 ? '+' : ''}${state.Q.toFixed(2)} pu`;
+
+            render();
+        }
+
+        // Event Listeners for Interaction
+        canvas.addEventListener('mousedown', (e) => {
+            state.isDragging = true;
+            handlePointerInput(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (state.isDragging) {
+                handlePointerInput(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            state.isDragging = false;
+        });
+
+        // Touch Support
+        canvas.addEventListener('touchstart', (e) => {
+            state.isDragging = true;
+            if (e.touches.length > 0) {
+                handlePointerInput(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (state.isDragging && e.touches.length > 0) {
+                handlePointerInput(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            state.isDragging = false;
+        });
+
+        // Slider Input Listeners
+        sliderP.addEventListener('input', (e) => {
+            state.P = parseFloat(e.target.value);
+            sliderP_Val.innerText = `${state.P.toFixed(2)} pu`;
+            render();
+        });
+
+        sliderQ.addEventListener('input', (e) => {
+            state.Q = parseFloat(e.target.value);
+            sliderQ_Val.innerText = `${state.Q >= 0 ? '+' : ''}${state.Q.toFixed(2)} pu`;
+            render();
+        });
+
+        // Machine Parameters Controls
+        paramSbase.addEventListener('input', (e) => {
+            state.S_base = parseFloat(e.target.value);
+            document.getElementById('paramSbaseVal').innerText = `${state.S_base} MVA`;
+            render();
+        });
+
+        paramPF.addEventListener('input', (e) => {
+            state.PF_rated = parseFloat(e.target.value);
+            document.getElementById('paramPFVal').innerText = `${state.PF_rated.toFixed(2)} Lagging`;
+            render();
+        });
+
+        paramXd.addEventListener('input', (e) => {
+            state.Xd = parseFloat(e.target.value);
+            document.getElementById('paramXdVal').innerText = `${state.Xd.toFixed(2)} pu`;
+            render();
+        });
+
+        paramPmax.addEventListener('input', (e) => {
+            state.P_max = parseFloat(e.target.value);
+            document.getElementById('paramPmaxVal').innerText = `${state.P_max.toFixed(2)} pu`;
+            render();
+        });
+
+        paramKs.addEventListener('input', (e) => {
+            state.Ks = parseFloat(e.target.value);
+            document.getElementById('paramKsVal').innerText = `${Math.round(state.Ks * 100)}% Margin`;
+            render();
+        });
+
+        // Presets Select
+        presetSelect.addEventListener('change', (e) => {
+            const pKey = e.target.value;
+            const p = presets[pKey] || presets.custom;
+
+            state.S_base = p.S_base;
+            state.PF_rated = p.PF;
+            state.Xd = p.Xd;
+            state.P_max = p.Pmax;
+            state.Ks = p.Ks;
+
+            // Update UI Sliders
+            paramSbase.value = p.S_base;
+            document.getElementById('paramSbaseVal').innerText = `${p.S_base} MVA`;
+
+            paramPF.value = p.PF;
+            document.getElementById('paramPFVal').innerText = `${p.PF.toFixed(2)} Lagging`;
+
+            paramXd.value = p.Xd;
+            document.getElementById('paramXdVal').innerText = `${p.Xd.toFixed(2)} pu`;
+
+            paramPmax.value = p.Pmax;
+            document.getElementById('paramPmaxVal').innerText = `${p.Pmax.toFixed(2)} pu`;
+
+            paramKs.value = p.Ks;
+            document.getElementById('paramKsVal').innerText = `${Math.round(p.Ks * 100)}% Margin`;
+
+            render();
+        });
+
+        // Reset Operating Point Button
+        resetPointBtn.addEventListener('click', () => {
+            state.P = 0.80;
+            state.Q = 0.30;
+            sliderP.value = 0.80;
+            sliderQ.value = 0.30;
+            sliderP_Val.innerText = '0.80 pu';
+            sliderQ_Val.innerText = '+0.30 pu';
+            render();
+        });
+
+        // Checkboxes
+        chkVector.addEventListener('change', (e) => { state.showVector = e.target.checked; render(); });
+        chkSafeZone.addEventListener('change', (e) => { state.showSafeZone = e.target.checked; render(); });
+        chkGrid.addEventListener('change', (e) => { state.showGrid = e.target.checked; render(); });
+
+        // Window Resize Observer
+        window.addEventListener('resize', resizeCanvas);
+
+        // Animation Loop for Smooth Pulse FX
+        function animateLoop() {
+            render();
+            requestAnimationFrame(animateLoop);
+        }
+
+        // Initialize on Load
+        window.onload = function() {
+            resizeCanvas();
+            animateLoop();
+        };
+    </script>
+</body>
+</html>
