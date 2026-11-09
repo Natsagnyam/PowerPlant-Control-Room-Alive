@@ -1,5 +1,5 @@
 # BBB Synchronous Generator P-Q Telemetry & Stability Limit Engine
-
+# Try this for free    https://natsagnyam.github.io/PowerPlant-Control-Room-Alive/www/pq_diagram.html
 A lightweight, real-time power plant control room telemetry engine and web dashboard running on **BeagleBone Black (BBB)**. This project models synchronous machine capability curves, rotor field current excitation contours, and the Under-Excitation Steady-State Stability Limit (SSSL) curve, bridging a native C backend to an interactive HTML5 browser UI via file-based JSON IPC.
 
 ![web_monitor](jpeg/pq1.png)
